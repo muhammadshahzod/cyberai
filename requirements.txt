@@ -1,0 +1,11 @@
+# --- Agent runtime ---
+strands-agents>=0.1.0        # Strands Agents SDK (uses Amazon Bedrock by default)
+
+# --- Web API ---
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# --- Tool dependencies ---
+requests>=2.31.0            # HaveIBeenPwned k-anonymity range API
+zxcvbn>=4.4.28             # password strength estimation
+python-whois>=0.9.4        # optional: domain-age heuristic in check_phishing

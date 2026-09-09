@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="popup.css" />
+  <title>CyberCheck</title>
+</head>
+<body>
+  <header>
+    <h1>CyberCheck</h1>
+    <button id="settings-toggle" title="Settings" aria-label="Settings">&#9881;</button>
+  </header>
+
+  <section id="settings" hidden>
+    <label for="backend-url">Backend URL</label>
+    <input id="backend-url" type="url" placeholder="http://localhost:5000" />
+    <button id="save-settings">Save</button>
+  </section>
+
+  <main>
+    <label for="value">Email, link, or password to check</label>
+    <input id="value" type="text" placeholder="paste an email, link, or password" autocomplete="off" />
+
+    <div class="row">
+      <label for="type">Check as</label>
+      <select id="type">
+        <option value="auto">Auto-detect</option>
+        <option value="email">Email</option>
+        <option value="url">Link / URL</option>
+        <option value="password">Password</option>
+      </select>
+      <button id="use-tab" type="button">Use current tab</button>
+    </div>
+
+    <button id="check" class="primary" type="button">Check</button>
+
+    <div id="result" hidden>
+      <div id="badge"></div>
+      <p id="summary"></p>
+      <details id="details-wrap">
+        <summary>Technical details</summary>
+        <pre id="details"></pre>
+      </details>
+    </div>
+
+    <p id="error" hidden></p>
+  </main>
+
+  <footer>Nothing you type is stored by this extension.</footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
