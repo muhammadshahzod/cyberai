@@ -119,6 +119,13 @@ Run tests: `pip install pytest && pytest -q`
    notification with the verdict.
 5. On every page, links whose visible text claims one domain but point to another
    get a dashed red outline and a "why" tooltip — fully local, no network.
+6. **Proactive protection (on by default):** every time you navigate to a new
+   site, CyberCheck runs a fast local heuristic and — only if that looks
+   suspicious — a backend check with a 2.5 s budget. If the verdict meets your
+   threshold (High by default) the tab is redirected to `blocked.html` and the
+   site never renders. From there you can go back, continue once, or always
+   allow the site. Any error or timeout **fails open** (the site loads). Turn it
+   off or loosen the threshold in ⚙.
 
 Only the backend URL / API key are persisted. Nothing you check is stored;
 passwords are SHA-1-prefixed before anything leaves the process.

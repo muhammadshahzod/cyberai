@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CyberCheck — site blocked</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #7f1d1d; color: #fff; padding: 24px;
+    }
+    .card {
+      background: #fff; color: #1f2937;
+      max-width: 560px; width: 100%;
+      border-radius: 16px; padding: 32px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+    .shield { font-size: 44px; }
+    h1 { margin: 8px 0 4px; font-size: 22px; color: #b91c1c; }
+    .host { font-weight: 700; word-break: break-all; }
+    .risk {
+      display: inline-block; margin-top: 6px; padding: 3px 12px; border-radius: 999px;
+      background: #b91c1c; color: #fff; font-weight: 800; font-size: 12px; letter-spacing: 1px;
+    }
+    ul { margin: 16px 0; padding-left: 20px; }
+    li { margin: 4px 0; }
+    .btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+    button {
+      flex: 1 1 auto; min-width: 160px;
+      padding: 12px 16px; border-radius: 10px; border: 0;
+      font: inherit; font-weight: 700; cursor: pointer;
+    }
+    .safe { background: #16a34a; color: #fff; }
+    .risky { background: #fff; color: #b91c1c; border: 1px solid #f3c4c4; font-weight: 600; }
+    .muted { color: #6b7280; font-size: 13px; margin-top: 18px; }
+    @media (prefers-color-scheme: dark) {
+      .card { background: #16213a; color: #e8edf7; }
+      h1 { color: #f87171; }
+      .risky { background: #1c2740; color: #f87171; border-color: #3a1618; }
+      .muted { color: #9fb0cc; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="shield">🛡️</div>
+    <h1>CyberCheck blocked this site</h1>
+    <p>You were about to open <span class="host" id="host">this site</span>.</p>
+    <div class="risk" id="risk">HIGH RISK</div>
+
+    <p id="why-lead" style="margin-top:16px;font-weight:600">Why it was flagged:</p>
+    <ul id="reasons"></ul>
+
+    <div class="btns">
+      <button class="safe" id="back">Get me out of here</button>
+      <button class="risky" id="once">Ignore once &amp; continue</button>
+      <button class="risky" id="always">Always allow this site</button>
+    </div>
+
+    <p class="muted">
+      CyberCheck checks each new site with local heuristics and (when reachable) an
+      AI security agent. If this was a mistake, use "Always allow this site".
+      You can turn proactive protection off in the CyberCheck popup → ⚙.
+    </p>
+  </div>
+  <script src="blocked.js"></script>
+</body>
+</html>

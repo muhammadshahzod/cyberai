@@ -35,6 +35,10 @@ function maskField(type) {
   $("value").type = type === "password" ? "password" : "text";
 }
 
+function reflectProtection() {
+  $("protection-bar").classList.toggle("off", !$("protection").checked);
+}
+
 function fmtAgo(ts) {
   const s = Math.round((Date.now() - ts) / 1000);
   if (s < 60) return s + "s ago";
@@ -193,23 +197,62 @@ async function probeBackend() {
 
 /* ---------------- init ---------------- */
 
+async function renderAllowlist() {
+  const { allowlist = [] } = await load("allowlist");
+  const wrap = $("allow-wrap");
+  const ul = $("allowlist");
+  ul.innerHTML = "";
+  if (!allowlist.length) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+  for (const host of allowlist) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${host}</span>`;
+    const rm = document.createElement("button");
+    rm.className = "link";
+    rm.textContent = "remove";
+    rm.addEventListener("click", async () => {
+      const cur = (await load("allowlist")).allowlist || [];
+      await store({ allowlist: cur.filter((h) => h !== host) });
+      renderAllowlist();
+    });
+    li.appendChild(rm);
+    ul.appendChild(li);
+  }
+}
+
 async function init() {
-  const { backendUrl, apiKey } = await load(["backendUrl", "apiKey"]);
-  $("backend-url").value = backendUrl || DEFAULT_BACKEND;
-  $("api-key").value = apiKey || "";
+  const s0 = await load(["backendUrl", "apiKey", "protectionEnabled", "blockThreshold"]);
+  $("backend-url").value = s0.backendUrl || DEFAULT_BACKEND;
+  $("api-key").value = s0.apiKey || "";
+  $("protection").checked = s0.protectionEnabled !== false;
+  $("threshold").value = s0.blockThreshold || "high";
+  reflectProtection();
 
   $("settings-toggle").addEventListener("click", () => {
     const s = $("settings");
     s.hidden = !s.hidden;
-    if (!s.hidden) probeBackend();
+    if (!s.hidden) { probeBackend(); renderAllowlist(); }
   });
 
   $("save-settings").addEventListener("click", async () => {
     await store({
       backendUrl: $("backend-url").value.trim() || DEFAULT_BACKEND,
       apiKey: $("api-key").value.trim(),
+      protectionEnabled: $("protection").checked,
+      blockThreshold: $("threshold").value,
     });
     probeBackend();
+  });
+
+  $("protection").addEventListener("change", () => {
+    store({ protectionEnabled: $("protection").checked });
+    reflectProtection();
+  });
+  $("threshold").addEventListener("change", () =>
+    store({ blockThreshold: $("threshold").value }));
+  $("clear-allow").addEventListener("click", async () => {
+    await store({ allowlist: [] });
+    renderAllowlist();
   });
 
   $("type").addEventListener("change", () => maskField($("type").value));

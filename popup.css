@@ -35,6 +35,29 @@ header {
 
 #settings-toggle { background: none; border: 0; color: #cfe0ff; font-size: 15px; cursor: pointer; }
 
+#protection-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 14px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+}
+#protection-bar .pb-label { display: flex; align-items: center; gap: 7px; }
+#protection-bar.off { opacity: 0.65; }
+
+.switch { position: relative; display: inline-block; width: 40px; height: 22px; flex: 0 0 auto; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; inset: 0; cursor: pointer;
+  background: #b8c2d6; border-radius: 999px; transition: 0.15s;
+}
+.slider::before {
+  content: ""; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px;
+  background: #fff; border-radius: 50%; transition: 0.15s;
+}
+.switch input:checked + .slider { background: #16a34a; }
+.switch input:checked + .slider::before { transform: translateX(18px); }
+
 #settings {
   padding: 12px 14px;
   background: #e9eef8;
@@ -42,6 +65,13 @@ header {
 }
 #settings label { display: block; font-weight: 600; margin: 8px 0 3px; }
 #settings label:first-child { margin-top: 0; }
+#settings label.check { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+#settings label.check input { width: auto; }
+#allowlist { list-style: none; margin: 4px 0 0; padding: 0; }
+#allowlist li {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 0; border-top: 1px solid var(--line); color: var(--muted);
+}
 
 main { padding: 14px; }
 

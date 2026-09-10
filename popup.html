@@ -12,13 +12,32 @@
     <button id="settings-toggle" title="Settings" aria-label="Settings">&#9881;</button>
   </header>
 
+  <div id="protection-bar">
+    <span class="pb-label"><span class="pb-ic">🛡️</span> Block dangerous sites before they open</span>
+    <label class="switch" title="Proactive protection">
+      <input id="protection" type="checkbox" />
+      <span class="slider"></span>
+    </label>
+  </div>
+
   <section id="settings" hidden>
+    <label for="threshold">Block when risk is</label>
+    <select id="threshold">
+      <option value="high">High only (recommended)</option>
+      <option value="medium">Medium or High (strict)</option>
+    </select>
+
     <label for="backend-url">Backend URL</label>
     <input id="backend-url" type="url" placeholder="https://…onrender.com" spellcheck="false" />
     <label for="api-key">API key <span class="muted">(optional)</span></label>
     <input id="api-key" type="password" placeholder="only if the backend requires one" />
     <button id="save-settings" class="ghost">Save settings</button>
     <p id="backend-status" class="muted"></p>
+
+    <div id="allow-wrap" hidden>
+      <div class="history-head">Allowed sites <button id="clear-allow" class="link">clear</button></div>
+      <ul id="allowlist"></ul>
+    </div>
   </section>
 
   <main>

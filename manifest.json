@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
   "name": "CyberCheck",
-  "version": "1.1.0",
-  "description": "Personal cybersecurity checker: scan emails, links, and passwords for risk.",
-  "permissions": ["activeTab", "storage", "contextMenus", "notifications", "scripting"],
+  "version": "1.2.0",
+  "description": "Personal cybersecurity checker: scan emails, links, and passwords — and block dangerous sites before they open.",
+  "permissions": ["activeTab", "storage", "contextMenus", "notifications", "scripting", "webNavigation", "tabs"],
   "host_permissions": [
     "https://cyberuzcheck-backend.onrender.com/*",
     "http://localhost:8000/*",
     "http://127.0.0.1:8000/*",
     "http://localhost:5000/*",
-    "http://127.0.0.1:5000/*"
+    "http://127.0.0.1:5000/*",
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"
