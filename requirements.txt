@@ -7,6 +7,8 @@ flask-cors>=4.0.0
 gunicorn>=21.2.0            # production WSGI server (used on Render / Railway / Fly)
 
 # --- Tool dependencies ---
-requests>=2.31.0            # HaveIBeenPwned k-anonymity range API
+requests>=2.31.0            # HIBP k-anonymity API, RDAP, Google Safe Browsing
 zxcvbn>=4.4.28             # password strength estimation
-python-whois>=0.9.4        # optional: domain-age heuristic in check_phishing
+
+# --- Dev / tests (optional) ---
+# pytest>=8.0

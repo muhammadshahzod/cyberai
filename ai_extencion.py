@@ -6,16 +6,26 @@ lives in this one folder.
 
 Run:
     pip install -r requirements.txt
-    python ai_extencion.py            # -> http://127.0.0.1:5000
+    python ai_extencion.py            # -> http://127.0.0.1:8000
 
 Endpoint:
     POST /api/check   {"type": "email"|"url"|"password", "value": "<string>"}
     ->                {"risk_level": "low"|"medium"|"high", "summary": "...", "details": {...}}
 
+Optional environment variables:
+    STRANDS_MODEL_ID   Bedrock model id for the agent (else Strands default)
+    AWS_REGION / AWS_* standard AWS creds -> enables the AI-written summary
+    GSB_API_KEY        Google Safe Browsing key -> real threat-feed lookup for URLs
+    HIBP_API_KEY       HaveIBeenPwned key -> email account-breach lookup
+    API_KEY            if set, callers must send  X-API-Key: <value>
+    RATE_LIMIT_PER_MIN requests per client IP per minute (default 120)
+    CACHE_TTL_SECONDS  response cache lifetime (default 900)
+
 Privacy:
     * check_breach            - only the first 5 chars of SHA-1(value) ever leave
                                the process (k-anonymity). Raw value never sent.
     * check_password_strength - raw password is never logged, stored, or echoed.
+    * the cache is keyed by a salted hash, never by the raw value.
     * the backend never logs the `value` field.
 """
 
@@ -26,6 +36,8 @@ import logging
 import os
 import re
 import threading
+import time
+from collections import OrderedDict, deque
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -65,12 +77,15 @@ def _finding(tool_name: str, severity: str, summary: str, details: dict) -> dict
     return finding
 
 
+_HTTP_TIMEOUT = 6
+_UA = {"User-Agent": "CyberCheck-Agent (hackathon; privacy-preserving)"}
+
+
 # ========================================================================== #
 # Tool 1 - breach check (k-anonymity)
 # ========================================================================== #
 HIBP_RANGE_URL = os.getenv("HIBP_RANGE_URL", "https://api.pwnedpasswords.com/range/")
 HIBP_API_KEY = os.getenv("HIBP_API_KEY", "").strip()
-_UA = {"User-Agent": "CyberCheck-Agent (hackathon; privacy-preserving)"}
 
 
 def _check_breach_impl(email: str) -> dict:
@@ -79,13 +94,14 @@ def _check_breach_impl(email: str) -> dict:
         return _finding("check_breach", "high", "No value was provided to check.", {})
 
     normalized = value.lower()
+    looks_like_email = "@" in normalized and "." in normalized.split("@")[-1]
     sha1 = hashlib.sha1(normalized.encode("utf-8")).hexdigest().upper()
     prefix, suffix = sha1[:5], sha1[5:]
 
     # (a) k-anonymity credential-exposure check - nothing sensitive leaves the box
     ka_hits: int | None = None
     try:
-        resp = requests.get(HIBP_RANGE_URL + prefix, headers=_UA, timeout=6)
+        resp = requests.get(HIBP_RANGE_URL + prefix, headers=_UA, timeout=_HTTP_TIMEOUT)
         resp.raise_for_status()
         ka_hits = 0
         for line in resp.text.splitlines():
@@ -98,7 +114,7 @@ def _check_breach_impl(email: str) -> dict:
 
     # (b) optional account-breach lookup - only if the operator opted in with a key
     account_breaches: list[dict] | None = None
-    if HIBP_API_KEY and "@" in normalized:
+    if HIBP_API_KEY and looks_like_email:
         try:
             ar = requests.get(
                 "https://haveibeenpwned.com/api/v3/breachedaccount/" + normalized,
@@ -137,17 +153,25 @@ def _check_breach_impl(email: str) -> dict:
     if ka_hits:
         severity = "high" if ka_hits > 10 else ("medium" if severity == "low" else severity)
         parts.append(
-            f"The exact string was seen {ka_hits:,} time(s) in leaked-password corpora "
-            "(matched via k-anonymity range check). If this is a password you use, change it now."
+            f"This exact string was seen {ka_hits:,} time(s) in leaked-credential corpora "
+            "(matched via k-anonymity range check). If you use it as a password anywhere, "
+            "change it now."
         )
     elif ka_hits == 0:
-        parts.append("No match in the k-anonymity credential-exposure corpus.")
+        parts.append("No match in the k-anonymity leaked-credential corpus.")
 
     if ka_hits is None and account_breaches is None:
         severity = "unknown"
         parts.append("Could not reach the breach databases; please try again later.")
 
+    if looks_like_email and not HIBP_API_KEY and account_breaches is None:
+        parts.append(
+            "Note: without an HaveIBeenPwned API key this only checks whether the address "
+            "string itself leaked as a credential, not every breach it may appear in."
+        )
+
     details = {
+        "input_kind": "email" if looks_like_email else "credential-string",
         "sha1_prefix_sent": prefix,
         "bytes_of_raw_value_sent": 0,
         "k_anonymity_hit_count": ka_hits,
@@ -163,27 +187,40 @@ def _check_breach_impl(email: str) -> dict:
 POPULAR_DOMAINS = [
     "google.com", "youtube.com", "facebook.com", "amazon.com", "apple.com",
     "microsoft.com", "paypal.com", "netflix.com", "instagram.com", "linkedin.com",
-    "bankofamerica.com", "wellsfargo.com", "chase.com", "coinbase.com", "binance.com",
-    "dropbox.com", "github.com", "twitter.com", "x.com", "whatsapp.com",
-    "gmail.com", "outlook.com", "office365.com", "icloud.com", "steamcommunity.com",
+    "bankofamerica.com", "wellsfargo.com", "citibank.com", "chase.com", "hsbc.com",
+    "coinbase.com", "binance.com", "kraken.com", "metamask.io", "blockchain.com",
+    "dropbox.com", "github.com", "gitlab.com", "twitter.com", "x.com",
+    "whatsapp.com", "telegram.org", "gmail.com", "outlook.com", "office365.com",
+    "office.com", "icloud.com", "yahoo.com", "steamcommunity.com", "steampowered.com",
+    "roblox.com", "discord.com", "spotify.com", "booking.com", "airbnb.com",
+    "dhl.com", "fedex.com", "ups.com", "usps.com", "irs.gov",
 ]
 
 SUSPICIOUS_TLDS = {
     "zip", "mov", "xyz", "top", "tk", "ml", "ga", "cf", "gq", "country", "click",
     "link", "work", "support", "gdn", "loan", "review", "kim", "men", "download",
     "stream", "racing", "party", "science", "date", "faith", "cricket", "accountant",
+    "rest", "fit", "cam", "quest", "sbs", "cfd", "bond", "monster", "lol",
 }
 
 BRAND_KEYWORDS = [
-    "paypal", "apple", "amazon", "microsoft", "google", "facebook", "instagram",
-    "netflix", "bankofamerica", "wellsfargo", "chase", "coinbase", "binance",
-    "dropbox", "github", "outlook", "office", "icloud", "whatsapp", "linkedin", "steam",
+    "paypal", "apple", "icloud", "amazon", "microsoft", "office", "outlook",
+    "google", "gmail", "facebook", "instagram", "whatsapp", "netflix", "spotify",
+    "bankofamerica", "wellsfargo", "citibank", "chase", "hsbc", "revolut",
+    "coinbase", "binance", "kraken", "metamask", "blockchain", "trustwallet",
+    "dropbox", "github", "steam", "discord", "roblox", "telegram", "linkedin",
+    "dhl", "fedex", "ups", "usps", "irs",
 ]
 
 MULTI_TLDS = {
     "co.uk", "org.uk", "gov.uk", "ac.uk", "com.au", "net.au", "org.au",
-    "co.jp", "co.nz", "co.za", "com.br", "com.mx",
+    "co.jp", "co.nz", "co.za", "com.br", "com.mx", "com.tr", "com.ua", "co.in",
 }
+
+# Common homoglyph / leetspeak substitutions used in look-alike domains.
+_DEHOMOGLYPH = str.maketrans({"0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "$": "s"})
+
+GSB_API_KEY = os.getenv("GSB_API_KEY", "").strip()
 
 
 def _registrable(host: str) -> str:
@@ -209,6 +246,58 @@ def _levenshtein(a: str, b: str) -> int:
             cur.append(min(prev[j] + 1, cur[-1] + 1, prev[j - 1] + (ca != cb)))
         prev = cur
     return prev[-1]
+
+
+def _rdap_domain_age_days(registrable: str) -> int | None:
+    """Registration age via RDAP (rdap.org). Faster and more reliable than WHOIS.
+    Returns None on any failure."""
+    try:
+        r = requests.get(
+            "https://rdap.org/domain/" + registrable, headers=_UA, timeout=4,
+            allow_redirects=True,
+        )
+        if not r.ok:
+            return None
+        for event in r.json().get("events", []):
+            if event.get("eventAction") == "registration" and event.get("eventDate"):
+                created = datetime.fromisoformat(event["eventDate"].replace("Z", "+00:00"))
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                return (datetime.now(timezone.utc) - created).days
+    except (requests.RequestException, ValueError, KeyError):
+        return None
+    return None
+
+
+def _safe_browsing_threat(url: str) -> str | None:
+    """Google Safe Browsing lookup. Returns the threat type string, or None."""
+    if not GSB_API_KEY:
+        return None
+    try:
+        r = requests.post(
+            "https://safebrowsing.googleapis.com/v4/threatMatches:find",
+            params={"key": GSB_API_KEY},
+            json={
+                "client": {"clientId": "cybercheck", "clientVersion": "1.0"},
+                "threatInfo": {
+                    "threatTypes": [
+                        "MALWARE", "SOCIAL_ENGINEERING",
+                        "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION",
+                    ],
+                    "platformTypes": ["ANY_PLATFORM"],
+                    "threatEntryTypes": ["URL"],
+                    "threatEntries": [{"url": url}],
+                },
+            },
+            timeout=_HTTP_TIMEOUT,
+        )
+        if r.ok:
+            matches = r.json().get("matches") or []
+            if matches:
+                return matches[0].get("threatType", "THREAT")
+    except (requests.RequestException, ValueError):
+        return None
+    return None
 
 
 def _check_phishing_impl(url: str) -> dict:
@@ -274,38 +363,42 @@ def _check_phishing_impl(url: str) -> dict:
             )
             break
 
+    # Typosquatting: near-miss of a popular domain, including homoglyph/leet swaps.
     typo_hit = None
+    reg_norm = reg.translate(_DEHOMOGLYPH)
     for good in POPULAR_DOMAINS:
-        if 1 <= _levenshtein(reg, good) <= 2:
+        d_raw = _levenshtein(reg, good)
+        if d_raw == 0:
+            break  # this IS the real domain
+        d_norm = _levenshtein(reg_norm, good)
+        # 1-2 edits from a real domain, OR a homoglyph swap that lands within 2.
+        if (1 <= d_raw <= 2) or (reg_norm != reg and d_norm <= 2):
             typo_hit = good
             break
     if typo_hit:
         score += 3
         signals.append(f"Domain is a near-identical look-alike of {typo_hit} (possible typosquatting).")
 
-    for token in ("secure", "login", "verify", "account", "update", "confirm", "signin", "webscr", "wallet"):
+    for token in ("secure", "login", "verify", "account", "update", "confirm",
+                  "signin", "webscr", "wallet", "recover", "unlock", "billing"):
         if token in host:
             score += 1
             signals.append(f"Host contains alarming keyword '{token}'.")
             break
 
+    # Domain age (RDAP) - skip for IPs and for well-known domains.
     age_days = None
-    try:  # best-effort; python-whois is optional and can be slow/flaky
-        import whois  # type: ignore
+    if not is_ip and reg not in POPULAR_DOMAINS:
+        age_days = _rdap_domain_age_days(reg)
+        if age_days is not None and 0 <= age_days < 90:
+            score += 2
+            signals.append(f"Domain was registered only {age_days} days ago.")
 
-        info = whois.whois(reg)
-        created = info.creation_date
-        if isinstance(created, list):
-            created = created[0]
-        if created:
-            if created.tzinfo is None:
-                created = created.replace(tzinfo=timezone.utc)
-            age_days = (datetime.now(timezone.utc) - created).days
-            if 0 <= age_days < 90:
-                score += 2
-                signals.append(f"Domain was registered only {age_days} days ago.")
-    except Exception:
-        pass
+    # Google Safe Browsing threat feed (only if a key is configured).
+    gsb_threat = _safe_browsing_threat(raw if has_scheme else "https://" + raw)
+    if gsb_threat:
+        score += 6
+        signals.append(f"Google Safe Browsing flagged this URL as {gsb_threat}.")
 
     severity = "high" if score >= 5 else "medium" if score >= 2 else "low"
     if not signals:
@@ -319,10 +412,11 @@ def _check_phishing_impl(url: str) -> dict:
         "is_ip_literal": is_ip,
         "possible_typosquat_of": typo_hit,
         "domain_age_days": age_days,
+        "safe_browsing_threat": gsb_threat,
         "heuristic_score": score,
         "signals": signals,
     }
-    summary = f"Heuristic phishing score {score}. " + " ".join(signals)
+    summary = f"Phishing risk score {score}. " + " ".join(signals)
     return _finding("check_phishing", severity, summary, details)
 
 
@@ -382,7 +476,7 @@ def _check_password_strength_impl(password: str) -> dict:
 # ========================================================================== #
 @tool
 def check_breach(email: str) -> dict:
-    """Check whether an email address (or a password string) has appeared in known
+    """Check whether an email address (or a credential string) has appeared in known
     data breaches. Privacy: the value is SHA-1 hashed locally and only the first
     five hex characters of that hash are sent to the breach API (k-anonymity); the
     raw value is never transmitted, logged, or stored. Use this for inputs of type
@@ -392,11 +486,12 @@ def check_breach(email: str) -> dict:
 
 @tool
 def check_phishing(url: str) -> dict:
-    """Assess whether a URL is likely to be phishing or malicious using heuristics:
-    HTTPS presence, suspicious TLDs, raw-IP hosts, punycode, brand keywords in the
-    wrong domain, typosquatting distance to popular domains, and (best-effort)
-    domain age via WHOIS. Use this for inputs of type 'url'. Returns a structured
-    finding with a severity and a short summary."""
+    """Assess whether a URL is likely to be phishing or malicious. Combines the
+    Google Safe Browsing threat feed (when configured) with heuristics: HTTPS
+    presence, suspicious TLDs, raw-IP hosts, punycode, brand keywords in the wrong
+    domain, homoglyph/typosquatting distance to popular domains, alarming keywords,
+    and domain age via RDAP. Use this for inputs of type 'url'. Returns a
+    structured finding with a severity and a short summary."""
     return _check_phishing_impl(url)
 
 
@@ -422,17 +517,18 @@ Each request gives you one item to assess, as two lines:
 Tool selection:
   - type email    -> call check_breach
   - type url      -> call check_phishing
-  - type password -> call check_password_strength
-Call the single matching tool exactly once. Do not ask follow-up questions.
+  - type password -> call check_password_strength, and also call check_breach on
+                     the same value (a reused password may have leaked).
+Call the matching tool(s) once each. Do not ask follow-up questions.
 
-After the tool returns, write a short report for a non-technical person: 2-4
+After the tool(s) return, write a short report for a non-technical person: 2-4
 sentences covering what you checked, what was found, the overall risk (low,
 medium, or high), and one or two concrete next steps. Plain sentences only - no
 markdown, no bullet points, no headings.
 
 Privacy: never repeat the raw email address, URL, or password in your reply.
 Refer to it as "this address", "this link", or "this password". Do not invent
-findings beyond what the tool reported.
+findings beyond what the tools reported.
 """
 
 
@@ -469,7 +565,7 @@ except ImportError:
     @app.after_request
     def _add_cors_headers(resp):
         resp.headers["Access-Control-Allow-Origin"] = "*"
-        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
         resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
         return resp
 
@@ -477,7 +573,62 @@ except ImportError:
 VALID_TYPES = {"email", "url", "password"}
 _SEVERITY_RANK = {"low": 0, "unknown": 1, "medium": 1, "high": 2}
 
+API_KEY = os.getenv("API_KEY", "").strip()
+RATE_LIMIT_PER_MIN = int(os.getenv("RATE_LIMIT_PER_MIN", "120"))
+CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "900"))
+_CACHE_SALT = os.getenv("CACHE_SALT", "cybercheck-v1")
+
 _agent = None
+_hits = {"cache": 0, "total": 0}
+
+# --- tiny in-process TTL cache (keyed by a salted hash, never the raw value) --- #
+_cache: "OrderedDict[str, tuple[float, dict]]" = OrderedDict()
+_cache_lock = threading.Lock()
+_CACHE_MAX = 500
+
+
+def _cache_key(itype: str, value: str) -> str:
+    return hashlib.sha256(f"{_CACHE_SALT}\0{itype}\0{value}".encode("utf-8")).hexdigest()
+
+
+def _cache_get(key: str):
+    with _cache_lock:
+        item = _cache.get(key)
+        if not item:
+            return None
+        ts, payload = item
+        if time.time() - ts > CACHE_TTL_SECONDS:
+            _cache.pop(key, None)
+            return None
+        _cache.move_to_end(key)
+        return payload
+
+
+def _cache_put(key: str, payload: dict) -> None:
+    with _cache_lock:
+        _cache[key] = (time.time(), payload)
+        _cache.move_to_end(key)
+        while len(_cache) > _CACHE_MAX:
+            _cache.popitem(last=False)
+
+
+# --- simple per-IP sliding-window rate limit --- #
+_rl: "dict[str, deque]" = {}
+_rl_lock = threading.Lock()
+
+
+def _rate_limited(client_ip: str) -> bool:
+    if RATE_LIMIT_PER_MIN <= 0:
+        return False
+    now = time.time()
+    with _rl_lock:
+        q = _rl.setdefault(client_ip, deque())
+        while q and now - q[0] > 60:
+            q.popleft()
+        if len(q) >= RATE_LIMIT_PER_MIN:
+            return True
+        q.append(now)
+    return False
 
 
 def get_agent():
@@ -494,6 +645,7 @@ def _run_tool_directly(itype: str, value: str) -> None:
         _check_phishing_impl(value)
     elif itype == "password":
         _check_password_strength_impl(value)
+        _check_breach_impl(value)
 
 
 def _aggregate_risk(findings: list[dict]) -> str:
@@ -503,13 +655,30 @@ def _aggregate_risk(findings: list[dict]) -> str:
     return worst if worst in ("low", "medium", "high") else "medium"
 
 
+def _collect_signals(findings: list[dict]) -> list[str]:
+    out: list[str] = []
+    for f in findings:
+        d = f.get("details") or {}
+        out.extend(d.get("signals") or [])
+        if d.get("warning"):
+            out.append(d["warning"])
+        for tip in d.get("suggestions") or []:
+            out.append(tip)
+    # de-dupe, keep order
+    seen = set()
+    uniq = []
+    for s in out:
+        if s not in seen:
+            seen.add(s)
+            uniq.append(s)
+    return uniq
+
+
 def _fallback_summary(findings: list[dict], risk: str) -> str:
     if not findings:
         return "No checks were completed for this input."
-    first = findings[0]
-    tips = first["details"].get("suggestions") or []
-    extra = f" Suggested next steps: {'; '.join(tips)}." if tips else ""
-    return f"{first['summary']} Overall risk level: {risk}.{extra}"
+    lead = "; ".join(f["summary"].rstrip(".") for f in findings)
+    return f"{lead}. Overall risk level: {risk}."
 
 
 @app.get("/")
@@ -518,18 +687,31 @@ def index():
         service="CyberCheck",
         endpoint="POST /api/check",
         body={"type": "email|url|password", "value": "<string>"},
+        auth_required=bool(API_KEY),
     )
 
 
 @app.get("/health")
 def health():
-    return jsonify(status="ok")
+    return jsonify(
+        status="ok",
+        agent_configured=Agent is not None and bool(os.getenv("AWS_REGION") or os.getenv("AWS_ACCESS_KEY_ID")),
+        safe_browsing=bool(GSB_API_KEY),
+        cache_entries=len(_cache),
+    )
 
 
 @app.route("/api/check", methods=["POST", "OPTIONS"])
 def check():
     if request.method == "OPTIONS":
         return ("", 204)
+
+    if API_KEY and request.headers.get("X-API-Key", "") != API_KEY:
+        return jsonify(error="missing or invalid X-API-Key"), 401
+
+    client_ip = (request.headers.get("X-Forwarded-For", request.remote_addr or "?")).split(",")[0].strip()
+    if _rate_limited(client_ip):
+        return jsonify(error="rate limit exceeded, slow down"), 429
 
     body = request.get_json(silent=True) or {}
     itype = str(body.get("type", "")).strip().lower()
@@ -539,6 +721,15 @@ def check():
         return jsonify(error="'type' must be one of: email, url, password"), 400
     if not isinstance(value, str) or not value.strip():
         return jsonify(error="'value' must be a non-empty string"), 400
+    if len(value) > 2048:
+        return jsonify(error="'value' is too long (max 2048 chars)"), 400
+
+    _hits["total"] += 1
+    key = _cache_key(itype, value)
+    cached = _cache_get(key)
+    if cached is not None:
+        _hits["cache"] += 1
+        return jsonify({**cached, "cached": True})
 
     new_collection()
     engine = "agent"
@@ -567,19 +758,23 @@ def check():
     else:
         details = {f["tool"]: f["details"] for f in findings}
 
+    payload = {
+        "risk_level": risk,
+        "summary": summary,
+        "signals": _collect_signals(findings),
+        "details": details,
+        "checks": [f["tool"] for f in findings],
+        "engine": engine,
+        "cached": False,
+    }
+    _cache_put(key, payload)
+
     # NOTE: `value` is never logged.
     log.info(
-        "check type=%s engine=%s risk=%s checks=%s",
-        itype, engine, risk, [f["tool"] for f in findings],
+        "check type=%s engine=%s risk=%s checks=%s ip=%s cache=%d/%d",
+        itype, engine, risk, payload["checks"], client_ip, _hits["cache"], _hits["total"],
     )
-
-    return jsonify(
-        risk_level=risk,
-        summary=summary,
-        details=details,
-        checks=[f["tool"] for f in findings],
-        engine=engine,
-    )
+    return jsonify(payload)
 
 
 if __name__ == "__main__":

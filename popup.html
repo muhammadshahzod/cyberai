@@ -8,46 +8,58 @@
 </head>
 <body>
   <header>
-    <h1>CyberCheck</h1>
+    <div class="brand"><span class="dot"></span> CyberCheck</div>
     <button id="settings-toggle" title="Settings" aria-label="Settings">&#9881;</button>
   </header>
 
   <section id="settings" hidden>
     <label for="backend-url">Backend URL</label>
-    <input id="backend-url" type="url" placeholder="http://localhost:5000" />
-    <button id="save-settings">Save</button>
+    <input id="backend-url" type="url" placeholder="https://…onrender.com" spellcheck="false" />
+    <label for="api-key">API key <span class="muted">(optional)</span></label>
+    <input id="api-key" type="password" placeholder="only if the backend requires one" />
+    <button id="save-settings" class="ghost">Save settings</button>
+    <p id="backend-status" class="muted"></p>
   </section>
 
   <main>
-    <label for="value">Email, link, or password to check</label>
     <input id="value" type="text" placeholder="paste an email, link, or password" autocomplete="off" />
 
     <div class="row">
-      <label for="type">Check as</label>
-      <select id="type">
+      <select id="type" aria-label="Check as">
         <option value="auto">Auto-detect</option>
         <option value="email">Email</option>
         <option value="url">Link / URL</option>
         <option value="password">Password</option>
       </select>
-      <button id="use-tab" type="button">Use current tab</button>
+      <button id="use-tab" class="ghost" type="button">This tab</button>
     </div>
 
     <button id="check" class="primary" type="button">Check</button>
 
+    <p id="status" class="status" hidden></p>
+
     <div id="result" hidden>
-      <div id="badge"></div>
+      <div class="badge-row">
+        <span id="badge" class="badge">—</span>
+        <span id="engine" class="engine muted"></span>
+      </div>
       <p id="summary"></p>
+      <ul id="signals"></ul>
       <details id="details-wrap">
-        <summary>Technical details</summary>
+        <summary>Raw details</summary>
         <pre id="details"></pre>
       </details>
     </div>
 
-    <p id="error" hidden></p>
+    <p id="error" class="error" hidden></p>
+
+    <section id="history-wrap" hidden>
+      <div class="history-head">Recent checks <button id="clear-history" class="link">clear</button></div>
+      <ul id="history"></ul>
+    </section>
   </main>
 
-  <footer>Nothing you type is stored by this extension.</footer>
+  <footer>Nothing you type is stored by this extension. Passwords never leave your device un-hashed.</footer>
 
   <script src="popup.js"></script>
 </body>
