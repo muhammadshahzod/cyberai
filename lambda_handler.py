@@ -1,4 +1,4 @@
-"""AWS Lambda entry point for the CyberCheck backend.
+"""AWS Lambda entry point for the CyberUzCheck backend.
 
 Deploy behind API Gateway / a Lambda Function URL. Requires `mangum`:
 

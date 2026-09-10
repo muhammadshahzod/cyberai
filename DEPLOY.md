@@ -1,4 +1,4 @@
-# Deploying the CyberCheck backend
+# Deploying the CyberUzCheck backend
 
 The backend is a normal WSGI app (`ai_extencion:app`), so it runs on any Python
 host. Below: **Render** (easiest free option), then notes for alternatives.
@@ -16,7 +16,7 @@ cd "cybercheck/cyberai"
 rm -rf .git __pycache__          # start clean (there were nested git repos)
 git init
 git add .
-git commit -m "CyberCheck backend"
+git commit -m "CyberUzCheck backend"
 # create an empty repo on github.com, then:
 git remote add origin https://github.com/<you>/cybercheck-backend.git
 git branch -M main
@@ -73,7 +73,7 @@ curl -s https://cybercheck-backend.onrender.com/api/check \
    ]
    ```
 
-2. `chrome://extensions` → reload the CyberCheck card.
+2. `chrome://extensions` → reload the CyberUzCheck card.
 3. Open the popup → ⚙ → **Backend URL** = `https://cybercheck-backend.onrender.com` → **Save**.
 
 Now the extension works from any machine, with your laptop off.

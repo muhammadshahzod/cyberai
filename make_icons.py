@@ -1,4 +1,4 @@
-"""Generate CyberCheck icons (16/48/128 px) with the standard library only.
+"""Generate CyberUzCheck icons (16/48/128 px) with the standard library only.
 
 A navy shield with a green check. Antialiased via 3x supersampling.
 

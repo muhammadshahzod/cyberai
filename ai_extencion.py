@@ -1,4 +1,4 @@
-"""CyberCheck - Personal Cybersecurity Checker Agent.
+"""CyberUzCheck - Personal Cybersecurity Checker Agent.
 
 AWS "Agents for Humans" hackathon project. One Strands agent + security tools,
 exposed over a small Flask API. Backend + Chrome extension live in this folder.
@@ -92,7 +92,7 @@ def _finding(tool_name: str, severity: str, summary: str, details: dict) -> dict
 
 
 _HTTP_TIMEOUT = 6
-_UA = {"User-Agent": "CyberCheck-Agent (hackathon; privacy-preserving)"}
+_UA = {"User-Agent": "CyberUzCheck-Agent (hackathon; privacy-preserving)"}
 GSB_API_KEY = os.getenv("GSB_API_KEY", "").strip()
 VT_API_KEY = os.getenv("VT_API_KEY", "").strip()
 HIBP_RANGE_URL = os.getenv("HIBP_RANGE_URL", "https://api.pwnedpasswords.com/range/")
@@ -649,7 +649,7 @@ def check_file_hash(file_hash: str) -> dict:
 # The single Strands agent
 # ========================================================================== #
 SYSTEM_PROMPT = """\
-You are "CyberCheck", a calm, practical personal-security assistant.
+You are "CyberUzCheck", a calm, practical personal-security assistant.
 
 Each request gives you one item to assess, as two lines:
   type: <email | url | password | headers | hash>
@@ -887,7 +887,7 @@ def _fallback_summary(findings: list[dict], risk: str) -> str:
 
 @app.get("/")
 def index():
-    return jsonify(service="CyberCheck", endpoint="POST /api/check",
+    return jsonify(service="CyberUzCheck", endpoint="POST /api/check",
                    types=sorted(VALID_TYPES), auth_required=bool(API_KEY))
 
 
@@ -978,7 +978,7 @@ def check():
     _cache_put(key, payload)
 
     if risk == "high":
-        _telegram(f"⚠ CyberCheck HIGH risk\ntype: {itype}\nhost: {host or '-'}\n{summary[:300]}")
+        _telegram(f"⚠ CyberUzCheck HIGH risk\ntype: {itype}\nhost: {host or '-'}\n{summary[:300]}")
 
     log.info("check type=%s engine=%s risk=%s checks=%s ip=%s cache=%d/%d",
              itype, engine, risk, payload["checks"], client_ip, _hits["cache"], _hits["total"])
@@ -995,7 +995,7 @@ def feedback():
         (time.time(), b.get("verdict_id"), str(b.get("host", ""))[:200],
          1 if b.get("correct") else 0, str(b.get("note", ""))[:500]),
     )
-    _telegram(f"📝 CyberCheck feedback: correct={bool(b.get('correct'))} "
+    _telegram(f"📝 CyberUzCheck feedback: correct={bool(b.get('correct'))} "
               f"host={b.get('host', '-')} note={str(b.get('note', ''))[:200]}")
     return jsonify(ok=True)
 
@@ -1065,11 +1065,11 @@ def stats():
         return jsonify(data)
     rows = "".join(f"<tr><td>{h['host']}</td><td>{h['count']}</td></tr>"
                    for h in data["top_high_risk_hosts"]) or "<tr><td colspan=2>none yet</td></tr>"
-    html = f"""<!doctype html><meta charset=utf-8><title>CyberCheck stats</title>
+    html = f"""<!doctype html><meta charset=utf-8><title>CyberUzCheck stats</title>
 <style>body{{font:14px system-ui;margin:40px;max-width:640px}}h1{{font-size:20px}}
 table{{border-collapse:collapse;width:100%;margin:12px 0}}td,th{{border:1px solid #ccc;padding:6px 10px;text-align:left}}
 code{{background:#f2f2f2;padding:1px 4px;border-radius:3px}}</style>
-<h1>CyberCheck &mdash; stats</h1>
+<h1>CyberUzCheck &mdash; stats</h1>
 <p><b>{total}</b> checks served &middot; cache hit rate <b>{data['cache_hit_rate']}</b></p>
 <p>By risk: <code>{json.dumps(data['by_risk'])}</code><br>By type: <code>{json.dumps(data['by_type'])}</code></p>
 <p>Feedback: {data['feedback_total']} reports ({data['feedback_marked_correct']} say the verdict was right)</p>

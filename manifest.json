@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "CyberCheck",
+  "name": "CyberUzCheck",
   "version": "1.2.0",
   "description": "Personal cybersecurity checker: scan emails, links, and passwords — and block dangerous sites before they open.",
   "permissions": ["activeTab", "storage", "contextMenus", "notifications", "scripting", "webNavigation", "tabs", "clipboardRead"],
   "commands": {
     "_execute_action": {
       "suggested_key": { "default": "Ctrl+Shift+Y", "mac": "Command+Shift+Y" },
-      "description": "Open CyberCheck"
+      "description": "Open CyberUzCheck"
     }
   },
   "host_permissions": [

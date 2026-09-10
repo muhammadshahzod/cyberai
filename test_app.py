@@ -1,4 +1,4 @@
-"""Basic tests for the CyberCheck backend.
+"""Basic tests for the CyberUzCheck backend.
 
     pip install pytest
     pytest -q

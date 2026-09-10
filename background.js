@@ -1,12 +1,12 @@
 "use strict";
 
 /*
- * CyberCheck service worker
+ * CyberUzCheck service worker
  *  1. Proactive protection: before a new site opens, run a fast LOCAL check;
  *     for anything suspicious, ask the backend (2.5s budget). If the verdict is
  *     "high" (or >= the user's threshold) the tab is redirected to blocked.html
  *     and the site never renders. Any error/timeout = fail OPEN (site loads).
- *  2. Right-click a link / selection -> "Check with CyberCheck" -> notification.
+ *  2. Right-click a link / selection -> "Check with CyberUzCheck" -> notification.
  *  3. Relays check requests from the popup / content script.
  */
 
@@ -219,7 +219,7 @@ function block(tabId, url, host, risk, reasons) {
     .catch(() => {});
   chrome.notifications.create({
     type: "basic", iconUrl: "icon48.png",
-    title: "CyberCheck blocked a site",
+    title: "CyberUzCheck blocked a site",
     message: `${host} looks ${risk.toUpperCase()} risk. Opened a safety page instead.`,
     priority: 2,
   });
@@ -325,14 +325,14 @@ async function checkAndNotify(value, type) {
     await chrome.storage.local.set({ history: history.slice(0, 15) });
     chrome.notifications.create({
       type: "basic", iconUrl: "icon48.png",
-      title: `CyberCheck: ${level} RISK`,
+      title: `CyberUzCheck: ${level} RISK`,
       message: (data.summary || "Check complete.").slice(0, 240),
       priority: data.risk_level === "high" ? 2 : 0,
     });
   } catch (e) {
     chrome.notifications.create({
       type: "basic", iconUrl: "icon48.png",
-      title: "CyberCheck: check failed", message: String(e.message || e),
+      title: "CyberUzCheck: check failed", message: String(e.message || e),
     });
   }
 }
@@ -345,8 +345,8 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (cur.blockThreshold === undefined) seed.blockThreshold = "high";
   if (Object.keys(seed).length) await chrome.storage.local.set(seed);
 
-  chrome.contextMenus.create({ id: "cc-link", title: "Check this link with CyberCheck", contexts: ["link"] });
-  chrome.contextMenus.create({ id: "cc-sel", title: 'Check "%s" with CyberCheck', contexts: ["selection"] });
+  chrome.contextMenus.create({ id: "cc-link", title: "Check this link with CyberUzCheck", contexts: ["link"] });
+  chrome.contextMenus.create({ id: "cc-sel", title: 'Check "%s" with CyberUzCheck', contexts: ["selection"] });
 });
 
 chrome.contextMenus.onClicked.addListener((info) => {

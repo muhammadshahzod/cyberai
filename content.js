@@ -1,7 +1,7 @@
 "use strict";
 
 /*
- * CyberCheck content script (local-first, page-safe):
+ * CyberUzCheck content script (local-first, page-safe):
  *  1. outline links whose visible text claims one domain but point to another
  *  2. warn before you type a password into a suspicious / unverified site
  */
@@ -64,7 +64,7 @@
       if (why) {
         a.classList.add(FLAG_CLASS);
         const prev = a.getAttribute("title");
-        a.setAttribute("title", (prev ? prev + " — " : "") + "⚠ CyberCheck: " + why);
+        a.setAttribute("title", (prev ? prev + " — " : "") + "⚠ CyberUzCheck: " + why);
       }
     }
   }
@@ -123,7 +123,7 @@
     const bar = document.createElement("div");
     bar.id = "__cybercheck_pwbar__";
     const txt = document.createElement("span");
-    txt.innerHTML = "<b>⚠ CyberCheck:</b> " +
+    txt.innerHTML = "<b>⚠ CyberUzCheck:</b> " +
       (reasons[0] || "This site is not verified. Be careful entering a password here.");
     const btn = document.createElement("button");
     btn.textContent = "Dismiss";
