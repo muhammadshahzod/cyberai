@@ -216,7 +216,10 @@ def _check_phishing_impl(url: str) -> dict:
     if not raw:
         return _finding("check_phishing", "high", "No URL was provided to check.", {})
 
-    parsed = urlparse(raw if "://" in raw else "http://" + raw)
+    # If the user didn't type a scheme (just "google.com"), assume https and do
+    # NOT penalise for "no HTTPS" - only an explicit "http://" is a red flag.
+    has_scheme = "://" in raw
+    parsed = urlparse(raw if has_scheme else "https://" + raw)
     host = (parsed.hostname or "").lower()
     if not host:
         return _finding(
@@ -226,13 +229,14 @@ def _check_phishing_impl(url: str) -> dict:
 
     score = 0
     signals: list[str] = []
-    is_https = parsed.scheme == "https" or raw.lower().startswith("https://")
+    explicit_http = raw.lower().startswith("http://")
+    is_https = not explicit_http
     is_ip = bool(re.match(r"^\d{1,3}(\.\d{1,3}){3}$", host))
     authority = raw.split("://", 1)[-1].split("/", 1)[0]
 
-    if not is_https:
+    if explicit_http:
         score += 2
-        signals.append("No HTTPS / secure scheme.")
+        signals.append("Uses plain HTTP instead of HTTPS.")
     if is_ip:
         score += 3
         signals.append("Uses a raw IP address instead of a domain name.")
@@ -579,5 +583,6 @@ def check():
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", "5000"))
+    # Port 8000 by default: on macOS, port 5000 is taken by AirPlay Receiver.
+    port = int(os.getenv("PORT", "8000"))
     app.run(host="127.0.0.1", port=port, debug=bool(os.getenv("FLASK_DEBUG")))

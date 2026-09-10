@@ -1,6 +1,6 @@
 "use strict";
 
-const DEFAULT_BACKEND = "http://localhost:5000";
+const DEFAULT_BACKEND = "http://localhost:8000";
 const $ = (id) => document.getElementById(id);
 
 async function getBackend() {

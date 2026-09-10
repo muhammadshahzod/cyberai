@@ -4,6 +4,7 @@ strands-agents>=0.1.0        # Strands Agents SDK (uses Amazon Bedrock by defaul
 # --- Web API ---
 flask>=3.0.0
 flask-cors>=4.0.0
+gunicorn>=21.2.0            # production WSGI server (used on Render / Railway / Fly)
 
 # --- Tool dependencies ---
 requests>=2.31.0            # HaveIBeenPwned k-anonymity range API

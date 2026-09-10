@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: cybercheck-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn ai_extencion:app --bind 0.0.0.0:$PORT --workers 2 --timeout 30
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      # Set these in the Render dashboard (Environment tab), not here:
+      - key: AWS_REGION
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: STRANDS_MODEL_ID
+        sync: false
+      - key: HIBP_API_KEY
+        sync: false
