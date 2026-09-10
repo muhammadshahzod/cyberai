@@ -25,6 +25,8 @@ async function getApiKey() {
 
 function detectType(raw) {
   const s = raw.trim();
+  if (/^[a-f0-9]{32}$|^[a-f0-9]{40}$|^[a-f0-9]{64}$/i.test(s)) return "hash";
+  if (/\n/.test(s) && /^(from|received|return-path|authentication-results|subject)\s*:/im.test(s)) return "headers";
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return "email";
   if (/^https?:\/\//i.test(s)) return "url";
   if (!/\s/.test(s) && /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(s)) return "url";
@@ -49,8 +51,19 @@ function fmtAgo(ts) {
 
 /* ---------------- rendering ---------------- */
 
+let lastVerdict = { id: null, host: "", reported: false };
+
 function render(data) {
   const level = String(data.risk_level || "unknown").toLowerCase();
+  lastVerdict = {
+    id: data.verdict_id ?? null,
+    host: (data.details && data.details.host) || "",
+    reported: false,
+  };
+  const rb = $("report");
+  rb.hidden = false;
+  rb.disabled = false;
+  rb.textContent = "Report this result as wrong";
   $("result").className = "";
   $("result").classList.add(level);
   $("badge").textContent = level.toUpperCase() + " RISK";
@@ -197,6 +210,21 @@ async function probeBackend() {
 
 /* ---------------- init ---------------- */
 
+async function mirrorAllowlistToSync(list) {
+  try { await chrome.storage.sync.set({ allowlist: list }); } catch { /* quota / offline */ }
+}
+
+async function mergeAllowlistFromSync() {
+  try {
+    const s = await chrome.storage.sync.get("allowlist");
+    if (Array.isArray(s.allowlist) && s.allowlist.length) {
+      const { allowlist = [] } = await load("allowlist");
+      const merged = Array.from(new Set([...allowlist, ...s.allowlist]));
+      await store({ allowlist: merged });
+    }
+  } catch { /* ignore */ }
+}
+
 async function renderAllowlist() {
   const { allowlist = [] } = await load("allowlist");
   const wrap = $("allow-wrap");
@@ -212,7 +240,9 @@ async function renderAllowlist() {
     rm.textContent = "remove";
     rm.addEventListener("click", async () => {
       const cur = (await load("allowlist")).allowlist || [];
-      await store({ allowlist: cur.filter((h) => h !== host) });
+      const next = cur.filter((h) => h !== host);
+      await store({ allowlist: next });
+      mirrorAllowlistToSync(next);
       renderAllowlist();
     });
     li.appendChild(rm);
@@ -252,8 +282,10 @@ async function init() {
     store({ blockThreshold: $("threshold").value }));
   $("clear-allow").addEventListener("click", async () => {
     await store({ allowlist: [] });
+    mirrorAllowlistToSync([]);
     renderAllowlist();
   });
+  mergeAllowlistFromSync();
 
   $("type").addEventListener("change", () => maskField($("type").value));
 
@@ -275,6 +307,35 @@ async function init() {
 
   $("check").addEventListener("click", runCheck);
   $("value").addEventListener("keydown", (e) => { if (e.key === "Enter") runCheck(); });
+
+  $("paste").addEventListener("click", async () => {
+    try {
+      const txt = await navigator.clipboard.readText();
+      if (txt) { $("value").value = txt.trim(); runCheck(); }
+      else showError("Clipboard is empty.");
+    } catch {
+      showError("Couldn't read the clipboard.");
+    }
+  });
+
+  $("report").addEventListener("click", async () => {
+    if (lastVerdict.reported) return;
+    lastVerdict.reported = true;
+    $("report").disabled = true;
+    $("report").textContent = "Thanks — reported.";
+    try {
+      const base = await getBackend();
+      const apiKey = await getApiKey();
+      const headers = { "Content-Type": "application/json" };
+      if (apiKey) headers["X-API-Key"] = apiKey;
+      await fetch(base + "/api/feedback", {
+        method: "POST", headers,
+        body: JSON.stringify({ verdict_id: lastVerdict.id, host: lastVerdict.host, correct: false }),
+      });
+    } catch { /* best effort */ }
+  });
+
+  getBackend().then((b) => { $("dashboard-link").href = b + "/stats"; });
 
   $("clear-history").addEventListener("click", async () => {
     await store({ history: [] });

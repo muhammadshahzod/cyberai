@@ -19,3 +19,8 @@ env/
 
 # Logs
 *.log
+
+# Local database
+*.db
+*.db-wal
+*.db-shm

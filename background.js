@@ -227,9 +227,45 @@ function block(tabId, url, host, risk, reasons) {
 
 chrome.webNavigation.onBeforeNavigate.addListener(guard);
 chrome.webNavigation.onCommitted.addListener((d) => {
-  // catch client-side redirects into a bad host too
-  if (d.frameId === 0 && d.transitionQualifiers &&
-      d.transitionQualifiers.includes("client_redirect")) guard(d);
+  if (d.frameId !== 0) return;
+  if (d.transitionQualifiers && d.transitionQualifiers.includes("client_redirect")) guard(d);
+  paintBadge(d.tabId, d.url);
+});
+
+/* ---------------- toolbar badge = current tab risk ---------------- */
+
+const BADGE = {
+  high:   { text: "!",  color: "#c1121f" },
+  medium: { text: "?",  color: "#b7791f" },
+  low:    { text: "",   color: "#1a7f37" },
+  unknown:{ text: "",   color: "#6b7280" },
+};
+
+function paintBadge(tabId, url) {
+  try {
+    if (!/^https?:\/\//i.test(url || "")) { chrome.action.setBadgeText({ tabId, text: "" }); return; }
+    const host = new URL(url).hostname.toLowerCase();
+    const reg = registrable(host);
+    let risk = "unknown";
+    if (TOP_SAFE.has(reg)) risk = "low";
+    const v = verdictCache.get(host);
+    if (v) risk = v.risk;
+    else {
+      const local = localScan(url);
+      if (local.score >= 5) risk = "high";
+      else if (local.score >= 2) risk = "medium";
+    }
+    const b = BADGE[risk] || BADGE.unknown;
+    chrome.action.setBadgeText({ tabId, text: b.text });
+    chrome.action.setBadgeBackgroundColor({ tabId, color: b.color });
+  } catch { /* ignore */ }
+}
+
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    paintBadge(tabId, tab.url || tab.pendingUrl || "");
+  } catch { /* ignore */ }
 });
 
 /* ---------------- "proceed anyway" bridge for blocked.html ---------------- */
@@ -260,6 +296,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       } catch (e) {
         sendResponse({ ok: false, error: String(e.message || e) });
       }
+    } else if (msg.action === "hostRisk" && msg.host) {
+      const v = verdictCache.get(msg.host);
+      const c2 = await cfg();
+      sendResponse({
+        ok: true,
+        risk: v ? v.risk : null,
+        reasons: v ? v.reasons : [],
+        allowlisted: c2.allowlist.has(msg.host) || TOP_SAFE.has(registrable(msg.host)),
+      });
     } else {
       sendResponse({ ok: false, error: "unknown action" });
     }

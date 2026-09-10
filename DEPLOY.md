@@ -94,6 +94,48 @@ All of them need: `requirements.txt`, the start command
 
 ---
 
+## Option B — Docker (App Runner / ECS / Cloud Run / Fly)
+
+A `Dockerfile` is included. It runs `gunicorn ai_extencion:app` and respects `$PORT`.
+
+```bash
+docker build -t cybercheck .
+docker run -p 8000:8000 --env-file .env cybercheck
+```
+
+- **AWS App Runner:** "Create service" → Source: container registry (push the image
+  to ECR first) or "Source code" → it auto-detects the Dockerfile. Set the env
+  vars in the console. Always-on, ~$5/mo.
+- **Google Cloud Run:** `gcloud run deploy cybercheck --source . --allow-unauthenticated`
+  — cold start ~1-2 s, generous free tier.
+
+## Option C — AWS Lambda (serverless, free tier is huge)
+
+```bash
+pip install mangum        # add to requirements.txt for the deploy
+```
+
+Package `ai_extencion.py`, `lambda_handler.py`, and the deps; set the handler to
+`lambda_handler.handler`; put it behind a **Function URL** or **API Gateway HTTP
+API**. Set the same env vars as Lambda configuration. Note: the sqlite `/stats`
+store is per-instance and ephemeral on Lambda — point `DB_PATH` at `/tmp` and
+treat stats as best-effort, or swap it for DynamoDB.
+
+## Environment variables (all optional)
+
+| Var | Effect |
+|---|---|
+| `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | enables the Strands agent (`engine: "agent"`) |
+| `STRANDS_MODEL_ID` | Bedrock model id |
+| `GSB_API_KEY` | Google Safe Browsing lookups for URLs |
+| `VT_API_KEY` | VirusTotal lookups for URLs and file hashes |
+| `HIBP_API_KEY` | HaveIBeenPwned account-breach list for emails |
+| `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` | push a message on every HIGH verdict |
+| `API_KEY` | require header `X-API-Key` |
+| `RATE_LIMIT_PER_MIN` | per-IP limit (default 120; 0 = off) |
+| `CACHE_TTL_SECONDS` | response cache lifetime (default 900) |
+| `DB_PATH` | sqlite file for `/stats`, feedback, monitors (default `cybercheck.db`) |
+
 ## Security reminders for a public deployment
 
 - The endpoint is unauthenticated. For anything beyond a demo, add an API key

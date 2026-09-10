@@ -90,3 +90,50 @@ def test_api_key_enforced(monkeypatch):
     assert _post(client, {"type": "password", "value": "x"}).status_code == 401
     ok = _post(client, {"type": "password", "value": "x"}, headers={"X-API-Key": "secret123"})
     assert ok.status_code == 200
+
+
+def test_email_headers_spoof_detected():
+    app_mod.new_collection()
+    raw = (
+        "From: PayPal <help@paypa1-security.ru>\n"
+        "Return-Path: <x@sketchy.tk>\n"
+        "Authentication-Results: mx; spf=fail; dkim=fail; dmarc=fail\n"
+        "Received: from a\n"
+    )
+    f = app_mod._check_email_headers_impl(raw)
+    assert f["severity"] == "high"
+    assert f["details"]["dmarc"] == "fail"
+    assert f["details"]["from_domain"] == "paypa1-security.ru"
+
+
+def test_headers_type_via_endpoint():
+    client = app.test_client()
+    r = _post(client, {"type": "headers", "value": "From: a@b.com\nAuthentication-Results: spf=pass; dkim=pass; dmarc=pass\nReceived: x"})
+    assert r.status_code == 200
+    assert "check_email_headers" in r.get_json()["checks"]
+
+
+def test_file_hash_invalid():
+    app_mod.new_collection()
+    f = app_mod._check_file_hash_impl("not-a-hash")
+    assert f["severity"] == "medium"
+
+
+def test_file_hash_without_key_is_unknown(monkeypatch):
+    monkeypatch.setattr(app_mod, "VT_API_KEY", "")
+    app_mod.new_collection()
+    f = app_mod._check_file_hash_impl("d41d8cd98f00b204e9800998ecf8427e")
+    assert f["severity"] == "unknown"
+
+
+def test_stats_json():
+    client = app.test_client()
+    r = client.get("/stats?format=json")
+    assert r.status_code == 200
+    assert "checks_total" in r.get_json()
+
+
+def test_feedback_accepts():
+    client = app.test_client()
+    r = client.post("/api/feedback", json={"host": "x.com", "correct": False, "note": "t"})
+    assert r.status_code == 200 and r.get_json()["ok"] is True

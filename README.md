@@ -12,11 +12,18 @@ Everything lives in this one folder.
 
 ## What it does
 
-| Input | Agent calls | You get |
+| Input (`type`) | Agent calls | You get |
 |---|---|---|
-| **email address** | `check_breach` | whether it shows up in leaked-credential corpora (k-anonymity) + optional HIBP account-breach list |
-| **link / URL** | `check_phishing` | Google Safe Browsing verdict + heuristics (typosquatting, punycode, brand abuse, TLD, domain age via RDAP…) |
-| **password** | `check_password_strength` (+ `check_breach`) | zxcvbn crack-time estimate, improvement tips, and whether the exact string has leaked |
+| **email** | `check_breach` | leaked-credential match (k-anonymity) + optional HIBP account-breach list |
+| **url** | `check_phishing` | Google Safe Browsing + URLhaus + VirusTotal + heuristics (typosquatting/homoglyph, punycode, brand abuse, TLD, RDAP domain age) |
+| **password** | `check_password_strength` + `check_breach` | zxcvbn crack-time + tips, and whether the exact string has leaked |
+| **headers** | `check_email_headers` | SPF/DKIM/DMARC results, From vs Return-Path vs Reply-To mismatch, display-name brand impersonation |
+| **hash** | `check_file_hash` | VirusTotal reputation for an MD5/SHA-1/SHA-256 file hash |
+
+Plus, in the extension: **proactive site blocking**, a **password-entry warning
+bar** on suspicious pages, a **toolbar badge** coloured by the current tab's risk,
+**right-click checks**, **"report as wrong"**, a **`/stats` dashboard**, and an
+optional **Telegram alert** on every HIGH verdict.
 
 Response shape:
 
