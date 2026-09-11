@@ -42,4 +42,39 @@ document.getElementById("risk").textContent = risk + " RISK";
   });
   document.getElementById("once").addEventListener("click", () => send("proceed"));
   document.getElementById("always").addEventListener("click", () => send("allowlist"));
+
+  // Remote preview: opt-in only (never automatic), and only origin+path is sent
+  // to the screenshot service - query parameters (which can carry personal
+  // tokens, e.g. a victim's email on a phishing link) are stripped first.
+  const previewBtn = document.getElementById("preview-toggle");
+  previewBtn.addEventListener("click", () => {
+    previewBtn.disabled = true;
+    previewBtn.textContent = "Loading preview…";
+
+    let safeUrl = target;
+    try {
+      const u = new URL(target);
+      safeUrl = u.origin + u.pathname;
+    } catch { /* keep raw target as a fallback */ }
+
+    const img = document.getElementById("preview-img");
+    const box = document.getElementById("preview-box");
+    const failTimer = setTimeout(() => {
+      previewBtn.hidden = false;
+      previewBtn.disabled = false;
+      previewBtn.textContent = "Preview took too long — try again";
+    }, 12000);
+
+    img.onload = () => {
+      clearTimeout(failTimer);
+      box.hidden = false;
+      previewBtn.hidden = true;
+    };
+    img.onerror = () => {
+      clearTimeout(failTimer);
+      previewBtn.disabled = false;
+      previewBtn.textContent = "Preview unavailable — try again";
+    };
+    img.src = "https://image.thum.io/get/width/700/noanimate/" + safeUrl;
+  });
 })();

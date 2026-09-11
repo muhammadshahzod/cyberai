@@ -37,11 +37,25 @@
     .safe { background: #16a34a; color: #fff; }
     .risky { background: #fff; color: #b91c1c; border: 1px solid #f3c4c4; font-weight: 600; }
     .muted { color: #6b7280; font-size: 13px; margin-top: 18px; }
+    #preview-wrap { margin-top: 14px; }
+    #preview-toggle {
+      width: 100%; background: #fff; color: #374151; border: 1px dashed #cbd5e1;
+      padding: 10px 14px; border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer;
+    }
+    #preview-box { margin-top: 10px; }
+    #preview-img {
+      display: block; width: 100%; border-radius: 10px; border: 1px solid #e5e7eb;
+      background: #f3f4f6; min-height: 80px;
+    }
+    #preview-note { font-size: 12px; color: #6b7280; margin-top: 6px; }
     @media (prefers-color-scheme: dark) {
       .card { background: #16213a; color: #e8edf7; }
       h1 { color: #f87171; }
       .risky { background: #1c2740; color: #f87171; border-color: #3a1618; }
       .muted { color: #9fb0cc; }
+      #preview-toggle { background: #1c2740; color: #cbd5e1; border-color: #334155; }
+      #preview-img { border-color: #334155; background: #0e1830; }
+      #preview-note { color: #9fb0cc; }
     }
   </style>
 </head>
@@ -54,6 +68,18 @@
 
     <p id="why-lead" style="margin-top:16px;font-weight:600">Why it was flagged:</p>
     <ul id="reasons"></ul>
+
+    <div id="preview-wrap">
+      <button id="preview-toggle" type="button">Preview what's on this site (rendered remotely, not opened)</button>
+      <div id="preview-box" hidden>
+        <img id="preview-img" alt="Remote screenshot of the blocked site" />
+        <p id="preview-note">
+          Rendered by a third-party screenshot service (thum.io) — the site itself
+          was never opened in your browser. Only the address without its query
+          parameters was sent to generate this image.
+        </p>
+      </div>
+    </div>
 
     <div class="btns">
       <button class="safe" id="back">Get me out of here</button>
